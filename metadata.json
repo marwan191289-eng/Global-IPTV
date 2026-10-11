@@ -1,0 +1,5 @@
+{
+  "name": "Global IPTV Player",
+  "description": "A modern web-based IPTV player using the global iptv-org database. Browse, search, and stream thousands of free channels from around the world.",
+  "requestFramePermissions": []
+}
