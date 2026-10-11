@@ -36,6 +36,7 @@ export interface PlaylistSource {
   id: string;
   name: string;
   url?: string;
+  content?: string;
   type: 'url' | 'file' | 'default';
   lastUpdated: number;
 }

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Link as LinkIcon, FileUp, X, CheckCircle2, Zap } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { FileUp, Link2, ListVideo, Plus, Server, Trash2, X } from 'lucide-react';
 import { PlaylistSource } from '../types';
 
 interface PlaylistManagerProps {
@@ -11,11 +11,7 @@ interface PlaylistManagerProps {
 }
 
 export const PlaylistManager: React.FC<PlaylistManagerProps> = ({
-  playlists,
-  activePlaylistId,
-  onAddPlaylist,
-  onSelectPlaylist,
-  onRemovePlaylist
+  playlists, activePlaylistId, onAddPlaylist, onSelectPlaylist, onRemovePlaylist,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [mode, setMode] = useState<'url' | 'file' | 'xtream' | null>(null);
@@ -23,202 +19,156 @@ export const PlaylistManager: React.FC<PlaylistManagerProps> = ({
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [formError, setFormError] = useState('');
+  const [readingFile, setReadingFile] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
 
-  const handleAddUrl = () => {
-    if (!url || !name) return;
-    onAddPlaylist({
-      id: Math.random().toString(36).substr(2, 9),
-      name,
-      url,
-      type: 'url',
-      lastUpdated: Date.now()
-    });
-    setUrl('');
-    setName('');
+  const resetForm = () => {
     setMode(null);
-  };
-
-  const handleAddXtream = () => {
-    if (!url || !username || !password || !name) return;
-    // Construct M3U URL from Xtream credentials
-    const baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
-    const xtreamUrl = `${baseUrl}/get.php?username=${username}&password=${password}&type=m3u_plus&output=ts`;
-    
-    onAddPlaylist({
-      id: Math.random().toString(36).substr(2, 9),
-      name,
-      url: xtreamUrl,
-      type: 'url',
-      lastUpdated: Date.now()
-    });
-    
     setUrl('');
     setName('');
     setUsername('');
     setPassword('');
-    setMode(null);
+    setFormError('');
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const addUrl = () => {
+    if (!name.trim() || !url.trim()) {
+      setFormError('أدخل اسماً ورابطاً صالحاً للقائمة.');
+      return;
+    }
+    try {
+      const parsed = new URL(url.trim());
+      if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error();
+    } catch {
+      setFormError('تحقق من صيغة الرابط؛ يجب أن يبدأ بـ http أو https.');
+      return;
+    }
+    const playlist: PlaylistSource = { id: `url-${Date.now().toString(36)}`, name: name.trim(), url: url.trim(), type: 'url', lastUpdated: Date.now() };
+    onAddPlaylist(playlist);
+    resetForm();
+  };
 
+  const addXtream = () => {
+    if (!name.trim() || !url.trim() || !username.trim() || !password) {
+      setFormError('أكمل جميع بيانات الاتصال.');
+      return;
+    }
+    try {
+      const base = new URL(url.trim());
+      const playlistUrl = new URL('/get.php', base);
+      playlistUrl.search = new URLSearchParams({ username: username.trim(), password, type: 'm3u_plus', output: 'ts' }).toString();
+      onAddPlaylist({ id: `xtream-${Date.now().toString(36)}`, name: name.trim(), url: playlistUrl.toString(), type: 'url', lastUpdated: Date.now() });
+      resetForm();
+    } catch {
+      setFormError('أدخل عنوان خادم صالحاً.');
+    }
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setReadingFile(true);
+    setFormError('');
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      onAddPlaylist({
-        id: Math.random().toString(36).substr(2, 9),
-        name: file.name.replace('.m3u', ''),
-        type: 'file',
-        lastUpdated: Date.now(),
-        // In a real app, we'd store the content or a reference
-        // For this demo, we'll pass the content through a custom event or state
-      });
-      // Trigger a custom event with the content
-      window.dispatchEvent(new CustomEvent('playlist-file-upload', { detail: content }));
-      setMode(null);
+    reader.onload = () => {
+      const content = typeof reader.result === 'string' ? reader.result : '';
+      if (!content.trim()) {
+        setFormError('الملف فارغ أو تعذرت قراءته.');
+        setReadingFile(false);
+        return;
+      }
+      const title = file.name.replace(/\.(m3u8?|txt)$/i, '');
+      onAddPlaylist({ id: `file-${Date.now().toString(36)}`, name: title || 'قائمة من ملف', type: 'file', content, lastUpdated: Date.now() });
+      setReadingFile(false);
+      resetForm();
+    };
+    reader.onerror = () => {
+      setFormError('تعذرت قراءة الملف. حاول اختيار ملف آخر.');
+      setReadingFile(false);
     };
     reader.readAsText(file);
   };
 
   return (
     <div className="relative">
-      <button 
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl text-xs font-bold transition-all border border-white/5"
+      <button
+        type="button"
+        onClick={() => setIsOpen(open => !open)}
+        aria-expanded={isOpen}
+        className="inline-flex h-10 items-center gap-2 rounded-xl border border-[hsl(var(--line))] bg-[hsl(var(--panel-raised))] px-3 text-xs font-semibold text-[hsl(var(--paper))] transition hover:border-[hsl(var(--accent)/.45)]"
       >
-        <Plus size={14} className="text-emerald-400" />
-        <span>إدارة الباقات والقوائم</span>
+        <ListVideo size={16} className="text-[hsl(var(--accent))]" />
+        <span className="hidden sm:inline">قوائمي</span>
+        <span className="rounded-full bg-[hsl(var(--ink)/.7)] px-1.5 py-0.5 text-[10px] text-[hsl(var(--muted))]">{playlists.length}</span>
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 sm:left-auto sm:right-0 mt-2 w-80 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl z-[100] overflow-hidden" dir="rtl">
-          <div className="p-4 border-b border-white/5 flex justify-between items-center bg-zinc-800/50">
-            <h4 className="text-xs font-bold text-zinc-300">قوائم التشغيل والباقات</h4>
-            <button onClick={() => setIsOpen(false)} className="text-zinc-500 hover:text-white p-1">
-              <X size={16} />
-            </button>
+        <div dir="rtl" className="absolute left-0 top-[calc(100%+10px)] z-[100] w-[min(21rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[hsl(var(--line))] bg-[hsl(var(--panel))] shadow-2xl shadow-black/40">
+          <div className="flex items-center justify-between border-b border-[hsl(var(--line))] px-4 py-3">
+            <div>
+              <h2 className="text-sm font-bold">مصادر المشاهدة</h2>
+              <p className="mt-0.5 text-[10px] text-[hsl(var(--muted))]">اختر قائمة أو أضف مصدراً خاصاً</p>
+            </div>
+            <button type="button" onClick={() => setIsOpen(false)} aria-label="إغلاق" className="grid h-8 w-8 place-items-center rounded-lg text-[hsl(var(--muted))] hover:bg-[hsl(var(--paper)/.06)] hover:text-[hsl(var(--paper))]"><X size={16} /></button>
           </div>
-
-          <div className="p-2 max-h-60 overflow-y-auto custom-scrollbar space-y-1">
-            {playlists.map(pl => (
-              <div 
-                key={pl.id}
-                className={`group flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-all ${
-                  activePlaylistId === pl.id ? 'bg-emerald-500/10 border border-emerald-500/30' : 'hover:bg-white/5 border border-transparent'
-                }`}
-                onClick={() => onSelectPlaylist(pl.id)}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${activePlaylistId === pl.id ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-zinc-700'}`} />
-                  <span className={`text-xs truncate ${activePlaylistId === pl.id ? 'text-emerald-400 font-bold' : 'text-zinc-300'}`}>
-                    {pl.name}
-                  </span>
-                </div>
-                {pl.type !== 'default' && (
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); onRemovePlaylist(pl.id); }}
-                    className="opacity-0 group-hover:opacity-100 p-1 text-zinc-500 hover:text-rose-400 transition-all"
-                    title="حذف"
-                  >
-                    <X size={14} />
+          <div className="max-h-56 space-y-1 overflow-y-auto p-2">
+            {playlists.map(playlist => (
+              <div key={playlist.id} className={`flex items-center gap-2 rounded-xl p-2 ${playlist.id === activePlaylistId ? 'bg-[hsl(var(--accent)/.1)]' : 'hover:bg-[hsl(var(--paper)/.04)]'}`}>
+                <button type="button" onClick={() => onSelectPlaylist(playlist.id)} aria-current={playlist.id === activePlaylistId ? 'true' : undefined} className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg p-1 text-right">
+                  <span className={`h-2 w-2 flex-shrink-0 rounded-full ${playlist.id === activePlaylistId ? 'bg-[hsl(var(--accent))]' : 'bg-[hsl(var(--line))]'}`} />
+                  <span className="min-w-0 flex-1 truncate text-xs font-medium">{playlist.name}</span>
+                  <span className="text-[9px] text-[hsl(var(--muted))]">{playlist.type === 'default' ? 'مضمّنة' : playlist.type === 'file' ? 'ملف' : 'رابط'}</span>
+                </button>
+                {playlist.type !== 'default' && (
+                  <button type="button" onClick={() => {
+                    if (window.confirm(`حذف قائمة «${playlist.name}»؟`)) onRemovePlaylist(playlist.id);
+                  }} aria-label={`حذف قائمة ${playlist.name}`} className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-lg text-[hsl(var(--muted))] hover:bg-rose-400/10 hover:text-rose-300">
+                    <Trash2 size={14} />
                   </button>
                 )}
               </div>
             ))}
           </div>
-
-          <div className="p-3 bg-zinc-800/30 border-t border-white/5 space-y-2">
+          <div className="border-t border-[hsl(var(--line))] bg-[hsl(var(--ink)/.25)] p-3">
             {!mode ? (
               <div className="grid grid-cols-3 gap-2">
-                <button 
-                  onClick={() => setMode('url')}
-                  className="flex flex-col items-center gap-1.5 p-2.5 bg-zinc-800/80 hover:bg-zinc-700 rounded-xl text-[11px] font-bold text-zinc-300 transition-all border border-white/5"
-                >
-                  <LinkIcon size={16} className="text-blue-400" />
-                  رابط M3U
+                <button type="button" onClick={() => setMode('url')} className="flex flex-col items-center gap-1.5 rounded-xl border border-[hsl(var(--line))] bg-[hsl(var(--panel-raised))] p-3 text-[10px] font-semibold hover:border-[hsl(var(--accent)/.4)]">
+                  <Link2 size={17} className="text-[hsl(var(--accent))]" />رابط M3U
                 </button>
-                <button 
-                  onClick={() => setMode('xtream')}
-                  className="flex flex-col items-center gap-1.5 p-2.5 bg-zinc-800/80 hover:bg-zinc-700 rounded-xl text-[11px] font-bold text-zinc-300 transition-all border border-white/5"
-                >
-                  <Zap size={16} className="text-amber-400" />
-                  Xtream
+                <button type="button" onClick={() => setMode('xtream')} className="flex flex-col items-center gap-1.5 rounded-xl border border-[hsl(var(--line))] bg-[hsl(var(--panel-raised))] p-3 text-[10px] font-semibold hover:border-[hsl(var(--accent)/.4)]">
+                  <Server size={17} className="text-[hsl(var(--teal))]" />Xtream
                 </button>
-                <button 
-                  onClick={() => setMode('file')}
-                  className="flex flex-col items-center gap-1.5 p-2.5 bg-zinc-800/80 hover:bg-zinc-700 rounded-xl text-[11px] font-bold text-zinc-300 transition-all border border-white/5"
-                >
-                  <FileUp size={16} className="text-emerald-400" />
-                  ملف M3U
+                <button type="button" onClick={() => { setMode('file'); fileInput.current?.click(); }} className="flex flex-col items-center gap-1.5 rounded-xl border border-[hsl(var(--line))] bg-[hsl(var(--panel-raised))] p-3 text-[10px] font-semibold hover:border-[hsl(var(--accent)/.4)]">
+                  <FileUp size={17} className="text-[hsl(var(--teal))]" />ملف قائمة
                 </button>
               </div>
-            ) : mode === 'url' ? (
-              <div className="space-y-2">
-                <input 
-                  type="text" 
-                  placeholder="اسم القائمة (مثلاً: قنواتي المفضلة)" 
-                  className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                />
-                <input 
-                  type="text" 
-                  placeholder="رابط البث M3U / M3U8" 
-                  className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  value={url}
-                  onChange={e => setUrl(e.target.value)}
-                />
-                <div className="flex gap-2">
-                  <button onClick={() => setMode(null)} className="flex-1 py-1.5 bg-zinc-800 text-zinc-400 hover:text-white rounded-xl text-xs font-bold">إلغاء</button>
-                  <button onClick={handleAddUrl} className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold">إضافة</button>
-                </div>
-              </div>
-            ) : mode === 'xtream' ? (
-              <div className="space-y-2">
-                <input 
-                  type="text" 
-                  placeholder="اسم السيرفر" 
-                  className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                />
-                <input 
-                  type="text" 
-                  placeholder="رابط السيرفر (مثال: http://host:port)" 
-                  className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  value={url}
-                  onChange={e => setUrl(e.target.value)}
-                />
-                <input 
-                  type="text" 
-                  placeholder="اسم المستخدم (Username)" 
-                  className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  value={username}
-                  onChange={e => setUsername(e.target.value)}
-                />
-                <input 
-                  type="password" 
-                  placeholder="كلمة المرور (Password)" 
-                  className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                />
-                <div className="flex gap-2">
-                  <button onClick={() => setMode(null)} className="flex-1 py-1.5 bg-zinc-800 text-zinc-400 hover:text-white rounded-xl text-xs font-bold">إلغاء</button>
-                  <button onClick={handleAddXtream} className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold">تسجيل الدخول</button>
-                </div>
+            ) : mode === 'file' ? (
+              <div className="text-center">
+                <input ref={fileInput} type="file" accept=".m3u,.m3u8,.txt" className="sr-only" onChange={handleFileUpload} />
+                <button type="button" onClick={() => fileInput.current?.click()} className="w-full rounded-xl border border-dashed border-[hsl(var(--line))] p-4 text-xs text-[hsl(var(--muted))] hover:border-[hsl(var(--accent)/.5)]">
+                  {readingFile ? 'جارٍ قراءة الملف…' : 'اختر ملف M3U من جهازك'}
+                </button>
+                <button type="button" onClick={() => { resetForm(); }} className="mt-2 text-xs text-[hsl(var(--muted))] hover:text-[hsl(var(--paper))]">إلغاء</button>
               </div>
             ) : (
               <div className="space-y-2">
-                <label className="flex flex-col items-center justify-center p-5 border-2 border-dashed border-white/10 rounded-xl hover:border-emerald-500/50 cursor-pointer transition-all group">
-                  <FileUp size={24} className="text-zinc-500 group-hover:text-emerald-500 mb-1.5" />
-                  <span className="text-xs text-zinc-400 font-medium">اضغط لاختيار ملف .m3u أو .m3u8</span>
-                  <input type="file" accept=".m3u,.m3u8" className="hidden" onChange={handleFileUpload} />
-                </label>
-                <button onClick={() => setMode(null)} className="w-full py-1.5 bg-zinc-800 text-zinc-400 hover:text-white rounded-xl text-xs font-bold">إلغاء</button>
+                <label className="sr-only" htmlFor="playlist-name">اسم القائمة</label>
+                <input id="playlist-name" value={name} onChange={event => setName(event.target.value)} placeholder="اسم القائمة" className="w-full rounded-xl border border-[hsl(var(--line))] bg-[hsl(var(--ink))] px-3 py-2.5 text-xs outline-none focus:border-[hsl(var(--accent))]" />
+                <label className="sr-only" htmlFor="playlist-url">{mode === 'xtream' ? 'عنوان الخادم' : 'رابط M3U'}</label>
+                <input id="playlist-url" dir="ltr" value={url} onChange={event => setUrl(event.target.value)} placeholder={mode === 'xtream' ? 'https://server:port' : 'https://example.com/playlist.m3u'} className="w-full rounded-xl border border-[hsl(var(--line))] bg-[hsl(var(--ink))] px-3 py-2.5 text-left text-xs outline-none focus:border-[hsl(var(--accent))]" />
+                {mode === 'xtream' && <>
+                  <input aria-label="اسم المستخدم" value={username} onChange={event => setUsername(event.target.value)} placeholder="اسم المستخدم" className="w-full rounded-xl border border-[hsl(var(--line))] bg-[hsl(var(--ink))] px-3 py-2.5 text-xs outline-none focus:border-[hsl(var(--accent))]" />
+                  <input aria-label="كلمة المرور" type="password" value={password} onChange={event => setPassword(event.target.value)} placeholder="كلمة المرور" className="w-full rounded-xl border border-[hsl(var(--line))] bg-[hsl(var(--ink))] px-3 py-2.5 text-xs outline-none focus:border-[hsl(var(--accent))]" />
+                </>}
+                {formError && <p role="alert" className="text-[11px] text-rose-300">{formError}</p>}
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => resetForm()} className="flex-1 rounded-xl bg-[hsl(var(--panel-raised))] py-2 text-xs font-semibold text-[hsl(var(--muted))] hover:text-[hsl(var(--paper))]">إلغاء</button>
+                  <button type="button" onClick={mode === 'url' ? addUrl : addXtream} className="flex-1 rounded-xl bg-[hsl(var(--accent))] py-2 text-xs font-bold text-[hsl(var(--ink))] hover:brightness-110"><Plus className="ml-1 inline" size={14} />إضافة وتحميل</button>
+                </div>
               </div>
             )}
+            {mode === 'file' && formError && <p role="alert" className="mt-2 text-[11px] text-rose-300">{formError}</p>}
           </div>
         </div>
       )}

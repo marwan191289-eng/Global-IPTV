@@ -1,45 +1,93 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Arabic:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
+:root {
+  color-scheme: dark;
+  --ink: 25 30% 9%;
+  --panel: 24 26% 12%;
+  --panel-raised: 24 23% 16%;
+  --line: 28 18% 23%;
+  --muted: 35 12% 60%;
+  --paper: 42 28% 92%;
+  --accent: 25 85% 61%;
+  --accent-soft: 26 55% 25%;
+  --teal: 166 40% 55%;
+  --font-sans: "DM Sans", "Noto Sans Arabic", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+}
+
+.dark {
+  --background: 25 30% 9%;
+  --foreground: 42 28% 92%;
+  --card: 24 26% 12%;
+  --card-foreground: 42 28% 92%;
+  --popover: 24 23% 16%;
+  --popover-foreground: 42 28% 92%;
+  --primary: 25 85% 61%;
+  --primary-foreground: 25 30% 9%;
+  --secondary: 24 23% 16%;
+  --secondary-foreground: 42 28% 92%;
+  --muted: 24 20% 17%;
+  --muted-foreground: 35 12% 60%;
+  --accent: 26 55% 25%;
+  --accent-foreground: 42 28% 92%;
+  --destructive: 0 62% 52%;
+  --destructive-foreground: 42 28% 92%;
+  --border: 28 18% 23%;
+  --input: 28 18% 23%;
+  --ring: 25 85% 61%;
+  --radius: 1rem;
+}
+
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-sans: "DM Sans", "Noto Sans Arabic", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
 }
 
 @layer base {
+  * { box-sizing: border-box; }
+  html { background: hsl(var(--ink)); }
   body {
-    @apply bg-[#0a0a0a] text-zinc-100 antialiased;
+    margin: 0;
+    min-width: 320px;
+    min-height: 100dvh;
+    background: hsl(var(--ink));
+    color: hsl(var(--paper));
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
   }
+  button, input { font: inherit; }
+  button { -webkit-tap-highlight-color: transparent; }
+  :focus-visible { outline: 2px solid hsl(var(--accent)); outline-offset: 3px; }
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-}
+::selection { background: hsl(var(--accent) / .3); color: hsl(var(--paper)); }
+::-webkit-scrollbar { width: 7px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(var(--line)); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted)); }
+.custom-scrollbar::-webkit-scrollbar { width: 5px; }
 
-::-webkit-scrollbar-track {
-  @apply bg-transparent;
+.app-shell {
+  background:
+    radial-gradient(ellipse at 6% 2%, hsl(var(--accent) / .09), transparent 26rem),
+    hsl(var(--ink));
 }
-
-::-webkit-scrollbar-thumb {
-  @apply bg-zinc-800 rounded-full hover:bg-zinc-700 transition-colors;
+.soft-grid {
+  background-image: linear-gradient(hsl(var(--paper) / .018) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--paper) / .018) 1px, transparent 1px);
+  background-size: 38px 38px;
+  mask-image: linear-gradient(to bottom, black, transparent 70%);
 }
+.surface { background: hsl(var(--panel) / .92); border: 1px solid hsl(var(--line) / .75); }
+.surface-raised { background: hsl(var(--panel-raised)); border: 1px solid hsl(var(--line)); }
+.brand-mark { background: linear-gradient(145deg, hsl(var(--accent)), hsl(14 68% 48%)); }
+.fade-up { animation: fade-up .42s both cubic-bezier(.2,.7,.2,1); }
+@keyframes fade-up { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: translateY(0); } }
+.skeleton { background: linear-gradient(90deg, hsl(var(--panel-raised)), hsl(var(--line) / .65), hsl(var(--panel-raised))); background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+.video-aspect { aspect-ratio: 16 / 9; }
+.glass { background: hsl(var(--panel) / .82); backdrop-filter: blur(16px); border: 1px solid hsl(var(--line) / .8); }
 
-.glass {
-  @apply bg-zinc-900/50 backdrop-blur-md border border-white/5;
-}
-
-.video-aspect {
-  aspect-ratio: 16 / 9;
-}
-
-.custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  @apply bg-transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  @apply bg-zinc-800 rounded-full hover:bg-emerald-500/50 transition-colors;
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
 }
